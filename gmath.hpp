@@ -5,6 +5,8 @@
 #include <string>
 #include <print>
 #include <assert.h>
+#include <math.h>
+#include <ostream>
 
 struct Mat4;
 struct Mat3;
@@ -16,15 +18,23 @@ struct Vec3 {
     float y;
     float z;
 	
-      float length() const {
-          return sqrtf(x*x + y*y + z*z);
-      }
+    float length() const {
+        return sqrtf(x*x + y*y + z*z);
+    }
+
     std::string to_str() {
 	return std::string("Vec3: ") + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z);
     }
 
     void multiply(const Mat4& m);
     void multiply(const Mat3& m);
+
+    void project() {
+	if (z == 0.f) return;
+	
+	x /= z;
+	y /= z;
+    }
 };
 
 
