@@ -8,6 +8,8 @@
 #include <math.h>
 #include <ostream>
 
+namespace gmath {
+
 struct Mat4;
 struct Mat3;
 
@@ -229,6 +231,11 @@ struct Mat4 {
 
 };
 
+template <typename T>
+T min (T a, T b) {
+    return (a < b) ? a : b;
+}
+
 
 void add_inplace(Vec3& a, const Vec3& b);
 Vec3 operator+(const Vec3& a, const Vec3& b);
@@ -365,5 +372,6 @@ bool float_eq(float a, float b, float eps) {
 
 #endif //GMATH_IMPLEMENTATION
 
+} // gmath
 
 #endif //GMATH_HPP
