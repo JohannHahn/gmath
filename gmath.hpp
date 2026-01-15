@@ -31,10 +31,16 @@ struct Vec3 {
     void multiply(const Mat4& m);
     void multiply(const Mat3& m);
 
+    void multiply(float f) {
+	x *= f;
+	y *= f;
+	z += f;
+    }
+
     Vec3 project(int width, int height) const {
 	Vec3 v;
 	v.z = z;
-	if (v.z == 0.f) v.z = 0.00001f;
+	//if (v.z == 0.f) v.z = 0.00001f;
 
 	//std::println("projecting {} to width = {}, height = {}", to_str(), width, height);
 	float clip_x = x / v.z;
@@ -48,6 +54,19 @@ struct Vec3 {
 	//std::println("final form = {}", v.to_str());
 
 	return v;
+    }
+    void add(const Vec3& v) {
+	x += v.x;
+	y += v.y;
+	z += v.z;
+    }
+
+    void normalize() {
+	float l = length();
+	if (l == 0.f) return;
+	x /= l;
+	y /= l;
+	z /= l;
     }
 };
 
@@ -209,6 +228,12 @@ struct Mat4 {
 	return out;
     }
 
+    Mat4 operator* (float f) {
+	Mat4 m = *this;
+	m.multiply(f);
+	return m;
+    }
+
     static Mat4 identity() {
 	return {{1.f, 0.f, 0.f, 0.f,  
 		 0.f, 1.f, 0.f, 0.f,  
@@ -244,36 +269,21 @@ struct Mat4 {
 	         0.f, 0.f, 0.f, 1.f}};
     }
 
+    static Mat4 rotation(float a1, float a2, float a3) {
+	return rotation_x(a1) * rotation_y(a2) * rotation_z(a3);
+    }
+
+    static Mat4 rotation(const Vec3& angles) {
+	return rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
+    }
+
     static Mat4 get_model(Vec3 pos, Vec3 angles) {
 	Mat4 m = identity();
 	m = translation(pos);
 	Mat4 rotation = rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
-	m.multiply(rotation);
-	return m;
-    }
-
-    static Mat4 inverse(const Mat4 m) {
-
-	Mat4 r;
-
-	// Transponiere 3x3 Rotation
-	r.data[0] = m.data[0]; r.data[1] = m.data[4]; r.data[2] = r.data[8];
-	r.data[4] = m.data[1]; r.data[5] = m.data[5]; r.data[6] = r.data[9];
-	r.data[8] = m.data[2]; r.data[9] = m.data[6]; r.data[10]= r.data[10];
-
-	// Inverse Translation
-	float tx = m.data[12];
-	float ty = m.data[13];
-	float tz = m.data[14];
-
-	r.data[12] = -(r.data[0]*tx + r.data[4]*ty + r.data[8]*tz);
-	r.data[13] = -(r.data[1]*tx + r.data[5]*ty + r.data[9]*tz);
-	r.data[14] = -(r.data[2]*tx + r.data[6]*ty + r.data[10]*tz);
-
-	// letzte Zeile
-	r.data[15] = 1.0f;
-
-	return r;
+	//m.multiply(rotation);
+	rotation.multiply(m);
+	return rotation;
     }
 
 };
@@ -346,6 +356,7 @@ Vec3 operator*(const Vec3& v, float t) {
 
 Vec3 operator/(const Vec3& v, float t) {
     Vec3 res;
+    assert(t != 0.f);
     res.x = v.x / t;
     res.y = v.y / t;
     res.z = v.z / t;
@@ -381,6 +392,7 @@ std::string operator<<(const Vec3 v, const char* str) {
 }
 
 Vec3 normalize(const Vec3& v) {
+	if (v.length() == 0.f) return v;
 	return v / v.length();
 }
 
