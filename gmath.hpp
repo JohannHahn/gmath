@@ -28,13 +28,19 @@ struct Vec3 {
 	return std::string("Vec3: ") + std::to_string(x) + ", " + std::to_string(y) + ", " + std::to_string(z);
     }
 
+    static Vec3 cross(const Vec3& a, const Vec3& b) {
+	return { a.y * b.z - a.z * b.y, 
+		 a.z * b.x - a.x * b.z,
+		 a.x * b.y - a.y * b.x };
+    }
+
     void multiply(const Mat4& m);
     void multiply(const Mat3& m);
 
     void multiply(float f) {
 	x *= f;
 	y *= f;
-	z += f;
+	z *= f;
     }
 
     Vec3 project(int width, int height) const {
@@ -70,6 +76,11 @@ struct Vec3 {
     }
 };
 
+Vec3 operator+(const Vec3& a, const Vec3& b);
+Vec3 operator-(const Vec3& a, const Vec3& b);
+Vec3 operator*(const Vec3& v, float t);
+Vec3 operator/(const Vec3& v, float t);
+
 
 struct Vec4 {
     float x;
@@ -86,6 +97,25 @@ struct Vec4 {
     }
 
     void multiply(const Mat4& m);
+
+    void normalize() {
+	float l = length();
+	if (l == 0.f) return;
+	x /= l;
+	y /= l;
+	z /= l;
+	w /= l;
+    }
+
+    float dot(const Vec4& a, const Vec4& b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    }
+
+    static Vec4 quat_axis_angle(Vec3 axis, float angle) {
+	float half = angle * 0.5f;
+	float s = sinf(half);
+	return {axis.x * s, axis.y * s, axis.z * s, cosf(half)};
+    }
 
 };
 
@@ -218,7 +248,7 @@ struct Mat4 {
     }
 
     std::string to_str() {
-	std::string out = "";
+	std::string out = "\n";
 	for (int y = 0; y < size; ++y) {
 	    for (int x = 0; x < size; ++x) {
 		out += std::to_string(data[x + y * size]) + " ";
@@ -248,40 +278,78 @@ struct Mat4 {
 		 0.f, 0.f, 0.f, 1.f}};
     }
 
-    static Mat4 rotation_x(float th) {
-	return {{1.f, 0.f, 0.f, 0.f,  
-		 0.f, cos(th), -sin(th), 0.f,  
-		 0.f, sin(th), cos(th), 0.f,  
-		 0.f, 0.f, 0.f, 1.f}};
+    //static Mat4 rotation_x(float th) {
+    //    return {{1.f, 0.f, 0.f, 0.f,  
+    //    	 0.f, cos(th), -sin(th), 0.f,  
+    //    	 0.f, sin(th), cos(th), 0.f,  
+    //    	 0.f, 0.f, 0.f, 1.f}};
+    //}
+
+    //static Mat4 rotation_y(float th) {
+    //    return {{cos(th), 0.f, sin(th), 0.f,  
+    //    	0.f,	  1.f, 0.f,     0.f,  
+    //    	-sin(th), 0.f, cos(th), 0.f,  
+    //    	 0.f,     0.f, 0.f,     1.f}};
+    //}
+
+    //static Mat4 rotation_z(float th) {
+    //    return {{cos(th), -sin(th), 0.f, 0.f, 
+    //    	sin(th), cos(th),   0.f, 0.f,  
+    //    	 0.f, 0.f, 1.f, 0.f,  
+    //             0.f, 0.f, 0.f, 1.f}};
+    //}
+
+    //static Mat4 rotation(float a1, float a2, float a3) {
+    //    return rotation_x(a1) * rotation_y(a2) * rotation_z(a3);
+    //}
+
+    //static Mat4 rotation(const Vec3& angles) {
+    //    return rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
+    //}
+
+    // quaternion to matrix
+    static Mat4 rotation_from_angles(Vec3 angles) {
+	Vec4 qx = Vec4::quat_axis_angle({ 1, 0, 0}, angles.x);
+	Vec4 qy = Vec4::quat_axis_angle({ 0, 1, 0}, angles.y);
+	Vec4 qz = Vec4::quat_axis_angle({ 0, 0, 1}, angles.z);
+
+	return rotation_from_quat(qx) * rotation_from_quat(qy) * rotation_from_quat(qz);
+    }
+    static Mat4 rotation_from_quat(Vec4 q) {
+	//q.normalize();
+
+	const float& qr = q.w;
+	const float& qi = q.x;
+	const float& qj = q.y;
+	const float& qk = q.z;
+
+	float s = q.length();
+	s = 1.f / (s * s);
+	float qj_sq = qj * qj;
+	float qk_sq = qk * qk;
+	float qi_sq = qi * qi;
+
+	float qiqj = qi * qj;
+	float qkqr = qk * qr;
+	float qjqk = qj * qk;
+	float qjqr = qj * qr;
+	float qiqr = qi * qr;
+	float qiqk = qi * qk;
+
+	return {{
+		1.f - 2.f * s * (qj_sq + qk_sq), 2.f * s * (qiqj - qkqr), 2.f * s * (qiqk + qjqr), 0.f,
+		2.f * s * (qiqj + qkqr), 1.f - 2.f * s * (qi_sq + qk_sq), 2.f * s * (qjqk - qiqr), 0.f,
+		2.f * s * (qiqk - qjqr), 2.f * s * (qjqk + qiqr), 1.f - 2.f * s * (qi_sq + qj_sq), 0.f,
+		0.f, 0.f, 0.f, 1.f
+
+	}};
     }
 
-    static Mat4 rotation_y(float th) {
-	return {{cos(th), 0.f, sin(th), 0.f,  
-		0.f,	  1.f, 0.f,     0.f,  
-		-sin(th), 0.f, cos(th), 0.f,  
-		 0.f,     0.f, 0.f,     1.f}};
-    }
-
-    static Mat4 rotation_z(float th) {
-	return {{cos(th), -sin(th), 0.f, 0.f, 
-		sin(th), cos(th),   0.f, 0.f,  
-		 0.f, 0.f, 1.f, 0.f,  
-	         0.f, 0.f, 0.f, 1.f}};
-    }
-
-    static Mat4 rotation(float a1, float a2, float a3) {
-	return rotation_x(a1) * rotation_y(a2) * rotation_z(a3);
-    }
-
-    static Mat4 rotation(const Vec3& angles) {
-	return rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
-    }
 
     static Mat4 get_model(Vec3 pos, Vec3 angles) {
 	Mat4 m = identity();
 	m = translation(pos);
-	Mat4 rotation = rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
-	//m.multiply(rotation);
+	Mat4 rotation = Mat4::rotation_from_angles(angles);
 	rotation.multiply(m);
 	return rotation;
     }
@@ -296,10 +364,6 @@ T min (T a, T b) {
 
 
 void add_inplace(Vec3& a, const Vec3& b);
-Vec3 operator+(const Vec3& a, const Vec3& b);
-Vec3 operator-(const Vec3& a, const Vec3& b);
-Vec3 operator*(const Vec3& v, float t);
-Vec3 operator/(const Vec3& v, float t);
 std::ostream& operator<<(std::ostream& outstr, const Vec3 v);
 std::string operator<<(const Vec3 v, const char* str);
 Vec3 normalize(const Vec3& v);
@@ -309,11 +373,6 @@ float lerpf(float start, float end, float t);
 bool float_eq(float a, float b, float eps = 0.0000001f);
 float clamp(float t, float low, float high);
 
-Vec3 cross(const Vec3& a, const Vec3& b) {
-    return { a.y * b.z - a.z * b.y, 
-	     a.z * b.x - a.x * b.z,
-	     a.x * b.y - a.y * b.x };
-}
 
 template <typename T>
 bool in_range(T start, T end, T value) {
