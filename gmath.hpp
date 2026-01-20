@@ -43,14 +43,16 @@ struct Vec3 {
 	z *= f;
     }
 
-    Vec3 project(int width, int height) const {
+    Vec3 project(int width, int height, float fov) const {
 	Vec3 v;
 	v.z = z;
+	float f = 1.f / tanf(fov * 0.5f);
+	assert(z != 0.f);
 	//if (v.z == 0.f) v.z = 0.00001f;
 
 	//std::println("projecting {} to width = {}, height = {}", to_str(), width, height);
-	float clip_x = x / v.z;
-	float clip_y = y / v.z;
+	float clip_x = x / v.z * f;
+	float clip_y = y / v.z * f;
 	//std::println("clipspace x = {}, y = {}", clip_x, clip_y);
 	
 	// move zero to top left and scale 
@@ -74,6 +76,7 @@ struct Vec3 {
 	y /= l;
 	z /= l;
     }
+
 };
 
 Vec3 operator+(const Vec3& a, const Vec3& b);
@@ -117,6 +120,33 @@ struct Vec4 {
 	return {axis.x * s, axis.y * s, axis.z * s, cosf(half)};
     }
 
+    void perspective_divide() {
+	//std::println("perspective divide on vertex: {}", to_str());
+	//if (z == 0.f) z = 0.00001f;
+	//x /= z;
+	//y /= z;
+    }
+
+    Vec4 project(int width, int height, float fov) const {
+	Vec4 v;
+	v.z = z;
+	float f = 1.f / tanf(fov * 0.5f);
+	assert(z != 0.f);
+	//if (v.z == 0.f) v.z = 0.00001f;
+
+	//std::println("projecting {} to width = {}, height = {}", to_str(), width, height);
+	float clip_x = x / v.z * f;
+	float clip_y = y / v.z * f;
+	//std::println("clipspace x = {}, y = {}", clip_x, clip_y);
+	
+	// move zero to top left and scale 
+	v.x = ((clip_x + 1.f) / 2.f) * width;
+	v.y = ((-clip_y + 1.f ) / 2.f) * height;
+
+	//std::println("final form = {}", v.to_str());
+
+	return v;
+    }
 };
 
 struct Mat2 {
@@ -247,7 +277,7 @@ struct Mat4 {
 	std::memset(data, 0.f, sizeof(float) * size * size);
     }
 
-    std::string to_str() {
+    std::string to_str() const {
 	std::string out = "\n";
 	for (int y = 0; y < size; ++y) {
 	    for (int x = 0; x < size; ++x) {
@@ -307,6 +337,27 @@ struct Mat4 {
     //    return rotation_x(angles.x) * rotation_y(angles.y) * rotation_z(angles.z);
     //}
 
+    static Mat4 projection(float aspect, float fovY, float near, float far) {
+	assert(aspect != 0.f);
+	assert(near != far);
+
+	//return {
+	//    far / aspect, 0.f, 0.f, 0.f,
+	//    0.f,	  far, 0.f, 0.f,
+	//    0.f,	  0.f, (far + near) / (near - far), (2.f * far * near) / (near-far),
+	//    0.f,	  0.f, -1.f, 0.f
+	//};
+	float tangent = tanf(fovY / 2.f);
+	float right = near * tangent;
+	float top = right / aspect;
+	return {
+	    near / right, 0.f, 0.f, 0.f,
+	    0.f, near / top, 0.f, 0.f,
+	    0.f, 0.f, -(far + near) / (far - near), -1.f,
+	    0.f, 0.f, -(2.f * far * near) / (far - near), 0.f
+	};
+    }
+
     // quaternion to matrix
     static Mat4 rotation_from_angles(Vec3 angles) {
 	Vec4 qx = Vec4::quat_axis_angle({ 1, 0, 0}, angles.x);
@@ -356,6 +407,11 @@ struct Mat4 {
 
 };
 
+template <typename T>
+void from_clip_to_viewport (T& vec, int width, int height) {
+    vec.x = ((vec.x + 1.f) / 2.f) * width;
+    vec.y = ((-vec.y + 1.f ) / 2.f) * height;
+}
 template <typename T>
 T min (T a, T b) {
     return (a < b) ? a : b;
@@ -488,6 +544,14 @@ void Vec4::multiply(const Mat4& m) {
     y = data[1];
     z = data[2];
     w = data[3];
+
+
+    if (w != 1.f) {
+	x /= w;
+	y /= w;
+	z /= w;
+    }
+
 }
 void Vec3::multiply(const Mat4& m) {
     float data[3] = {0};
